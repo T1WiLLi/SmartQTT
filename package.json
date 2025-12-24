@@ -1,6 +1,6 @@
 {
   "name": "smartqtt",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "description": "SmartQTT — a modern MQTT client library for Node.js and browsers (WebSocket).",
   "license": "MIT",
   "author": "William Beaudin",

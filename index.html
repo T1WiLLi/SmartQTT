@@ -1,0 +1,335 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SmartQTT Test</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+            margin: 16px;
+        }
+
+        .row {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            align-items: end;
+        }
+
+        label {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            font-size: 12px;
+            color: #333;
+        }
+
+        input,
+        select,
+        button,
+        textarea {
+            padding: 8px 10px;
+            font-size: 14px;
+        }
+
+        input,
+        textarea,
+        select {
+            min-width: 260px;
+        }
+
+        button {
+            cursor: pointer;
+        }
+
+        #log {
+            width: 100%;
+            height: 340px;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        }
+
+        .pill {
+            font-size: 12px;
+            padding: 2px 8px;
+            border: 1px solid #ccc;
+            border-radius: 999px;
+            display: inline-block;
+        }
+
+        .muted {
+            color: #666;
+            font-size: 12px;
+        }
+
+        .section {
+            margin-top: 16px;
+            padding-top: 16px;
+            border-top: 1px solid #eee;
+        }
+    </style>
+</head>
+
+<body>
+    <h1 style="margin: 0 0 8px 0;">SmartQTT Test</h1>
+    <div class="muted">
+        Default broker is EMQX public WebSocket endpoint (<span class="pill">/mqtt</span> path required). You can switch
+        to Mosquitto if you want.
+    </div>
+
+    <div class="section">
+        <div class="row">
+            <label>
+                Broker URL (WS)
+                <input id="url" value="wss://broker.emqx.io:8084/mqtt" />
+            </label>
+
+            <label>
+                Client ID
+                <input id="clientId" />
+            </label>
+
+            <label>
+                Username (optional)
+                <input id="username" placeholder="(optional)" />
+            </label>
+
+            <label>
+                Password (optional)
+                <input id="password" type="password" placeholder="(optional)" />
+            </label>
+
+            <div style="display:flex; gap:8px; align-items:center;">
+                <button id="connectBtn">Connect</button>
+                <button id="disconnectBtn" disabled>Dispose</button>
+                <span id="status" class="pill">disconnected</span>
+            </div>
+        </div>
+
+        <div class="row" style="margin-top: 10px;">
+            <button id="useEmqx">Use EMQX (wss)</button>
+            <button id="useMosquitto">Use Mosquitto (wss)</button>
+            <span class="muted">
+                Mosquitto secure WS port is 8081. EMQX secure WS port is 8084 and default path is <span
+                    class="pill">/mqtt</span>.
+            </span>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2 style="margin: 0 0 10px 0;">Subscribe</h2>
+        <div class="row">
+            <label>
+                Topic filter
+                <input id="subTopic" value="smartqtt/demo/#" />
+            </label>
+
+            <label>
+                Decode mode
+                <select id="decode">
+                    <option value="utf8" selected>utf8 (string)</option>
+                    <option value="json">json</option>
+                    <option value="binary">binary (Uint8Array)</option>
+                </select>
+            </label>
+
+            <button id="subBtn" disabled>Subscribe</button>
+            <button id="unsubBtn" disabled>Unsubscribe</button>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2 style="margin: 0 0 10px 0;">Publish</h2>
+        <div class="row">
+            <label>
+                Topic
+                <input id="pubTopic" value="smartqtt/demo/hello" />
+            </label>
+
+            <label>
+                Payload (string or JSON)
+                <input id="payload" value='{"hello":"world"}' />
+            </label>
+
+            <button id="pubBtn" disabled>Publish (string)</button>
+            <button id="pubJsonBtn" disabled>Publish (JSON)</button>
+        </div>
+        <div class="muted" style="margin-top: 8px;">
+            Tip: keep your topics unique (e.g. include your name or a UUID) when using public brokers.
+        </div>
+    </div>
+
+    <div class="section">
+        <h2 style="margin: 0 0 10px 0;">Log</h2>
+        <textarea id="log" readonly></textarea>
+    </div>
+
+    <script type="module">
+        // Local build import (after pnpm build)
+        import { smartqtt } from "../dist/index.mjs";
+
+        const $ = (id) => document.getElementById(id);
+
+        const urlEl = $("url");
+        const clientIdEl = $("clientId");
+        const userEl = $("username");
+        const passEl = $("password");
+
+        const connectBtn = $("connectBtn");
+        const disconnectBtn = $("disconnectBtn");
+        const statusEl = $("status");
+
+        const subTopicEl = $("subTopic");
+        const decodeEl = $("decode");
+        const subBtn = $("subBtn");
+        const unsubBtn = $("unsubBtn");
+
+        const pubTopicEl = $("pubTopic");
+        const payloadEl = $("payload");
+        const pubBtn = $("pubBtn");
+        const pubJsonBtn = $("pubJsonBtn");
+
+        const useEmqx = $("useEmqx");
+        const useMosquitto = $("useMosquitto");
+
+        const logEl = $("log");
+        const log = (line) => {
+            const ts = new Date().toISOString();
+            logEl.value += `[${ts}] ${line}\n`;
+            logEl.scrollTop = logEl.scrollHeight;
+        };
+
+        // Defaults
+        clientIdEl.value = `smartqtt-web-${crypto.randomUUID().slice(0, 8)}`;
+
+        let client = null;
+        let offSub = null;
+
+        function setConnectedUi(connected) {
+            statusEl.textContent = connected ? "connected" : "disconnected";
+            connectBtn.disabled = connected;
+            disconnectBtn.disabled = !connected;
+            subBtn.disabled = !connected;
+            pubBtn.disabled = !connected;
+            pubJsonBtn.disabled = !connected;
+            unsubBtn.disabled = !connected || !offSub;
+        }
+
+        setConnectedUi(false);
+
+        useEmqx.addEventListener("click", () => {
+            urlEl.value = "wss://broker.emqx.io:8084/mqtt";
+            log("Set broker URL to EMQX public (wss://broker.emqx.io:8084/mqtt)");
+        });
+
+        useMosquitto.addEventListener("click", () => {
+            urlEl.value = "wss://test.mosquitto.org:8081";
+            log("Set broker URL to Mosquitto test (wss://test.mosquitto.org:8081)");
+        });
+
+        connectBtn.addEventListener("click", async () => {
+            try {
+                const url = urlEl.value.trim();
+                const clientId = clientIdEl.value.trim();
+
+                if (!url) throw new Error("Broker URL is required");
+                if (!clientId) throw new Error("Client ID is required");
+
+                client = smartqtt(url, {
+                    clientId,
+                    username: userEl.value.trim() || undefined,
+                    password: passEl.value || undefined,
+                    autoConnect: false
+                });
+
+                client.on("connect", (e) => log(`CONNECT (sessionPresent=${e.sessionPresent})`));
+                client.on("reconnect", (e) => log(`RECONNECT (attempt=${e.attempt}, delayMs=${e.delayMs})`));
+                client.on("disconnect", (e) => log(`DISCONNECT (reason=${e.reason})`));
+                client.on("error", (e) => log(`ERROR: ${String(e.error?.message || e.error)}`));
+
+                log(`Connecting to ${url} as clientId=${clientId}...`);
+                await client.connect();
+
+                setConnectedUi(true);
+            } catch (err) {
+                log(`Connect failed: ${String(err?.message || err)}`);
+                try { client?.dispose?.(); } catch { }
+                client = null;
+                setConnectedUi(false);
+            }
+        });
+
+        disconnectBtn.addEventListener("click", () => {
+            try {
+                offSub?.();
+                offSub = null;
+                client?.dispose();
+                client = null;
+                log("Disposed client handle");
+            } finally {
+                setConnectedUi(false);
+            }
+        });
+
+        subBtn.addEventListener("click", () => {
+            if (!client) return;
+
+            const filter = subTopicEl.value.trim();
+            const decode = decodeEl.value;
+
+            if (!filter) {
+                log("Subscribe failed: topic filter is required");
+                return;
+            }
+
+            // clear prior sub for simplicity
+            offSub?.();
+            offSub = null;
+
+            offSub = client.subscribe(filter, (msg) => {
+                if (decode === "binary") {
+                    log(`MSG ${msg.topic} (binary len=${msg.payload.length}) bytes=[${Array.from(msg.payload.slice(0, 16)).join(",")}${msg.payload.length > 16 ? ",..." : ""}]`);
+                } else {
+                    log(`MSG ${msg.topic} payload=${JSON.stringify(msg.payload)}`);
+                }
+            }, { decode });
+
+            log(`Subscribed to ${filter} (decode=${decode})`);
+            unsubBtn.disabled = false;
+        });
+
+        unsubBtn.addEventListener("click", () => {
+            offSub?.();
+            offSub = null;
+            log("Unsubscribed (local handler removed; broker unsub may occur if no other handlers exist)");
+            unsubBtn.disabled = true;
+        });
+
+        pubBtn.addEventListener("click", () => {
+            if (!client) return;
+            const topic = pubTopicEl.value.trim();
+            if (!topic) return log("Publish failed: topic is required");
+
+            const payload = payloadEl.value;
+            client.publish(topic, payload);
+            log(`Published string to ${topic}: ${payload}`);
+        });
+
+        pubJsonBtn.addEventListener("click", () => {
+            if (!client) return;
+            const topic = pubTopicEl.value.trim();
+            if (!topic) return log("Publish failed: topic is required");
+
+            try {
+                const obj = JSON.parse(payloadEl.value);
+                client.publishJson(topic, obj);
+                log(`Published JSON to ${topic}: ${JSON.stringify(obj)}`);
+            } catch {
+                log("Publish JSON failed: payload is not valid JSON");
+            }
+        });
+    </script>
+</body>
+
+</html>

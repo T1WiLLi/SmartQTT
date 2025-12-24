@@ -7,7 +7,7 @@ import type {
     PublishOptions,
     ClientEventMap,
     ResolvedSmartQTTOptions
-} from "./types.js";
+} from "./types";
 import { getSharedCore, releaseSharedCore } from "./shared";
 import { SmartQTTCore } from "./core";
 
