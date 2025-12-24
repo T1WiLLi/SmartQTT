@@ -1,4 +1,4 @@
-export class TypedEvent<TEvents extends Record<string, any>> {
+export class TypedEvents<TEvents extends Record<string, any>> {
     private listeners = new Map<keyof TEvents, Set<(e: any) => void>>();
 
     on<K extends keyof TEvents>(event: K, fn: (e: TEvents[K]) => void): () => void {

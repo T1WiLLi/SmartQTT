@@ -12,7 +12,7 @@ export class ByteQueue {
             return;
         }
         this.chunks.push(chunk);
-        this._length += this.chunks.length;
+        this._length += chunk.length;
     }
 
     peek(i: number): number | null {

@@ -29,6 +29,29 @@ export type SmartQTTOptions = {
     };
 };
 
+export type ResolvedSmartQTTOptions = {
+    clientId: string;
+    username?: string;
+    password?: string;
+    autoConnect: boolean;
+    cleanSession: boolean;
+    keepAliveSec: number;
+    pingTimeoutMs: number;
+    connectTimeoutMs: number;
+    reconnect: {
+        enabled: boolean;
+        minDelayMs: number;
+        maxDelayMs: number;
+        jitterRatio: number;
+    };
+    shared: boolean;
+    sharedKey: string;
+    maxQueueBytes: number;
+    ws: {
+        protocols: string | string[];
+    };
+};
+
 export type IncomingMessage<TPayload = string> = {
     topic: string;
     payload: TPayload;
