@@ -1,17 +1,25 @@
 {
-  "name": "tsdown-starter",
-  "type": "module",
+  "name": "smartqtt",
   "version": "0.0.0",
-  "description": "A starter for creating a TypeScript package.",
-  "author": "Author Name <author.name@mail.com>",
+  "description": "SmartQTT — a modern MQTT client library for Node.js and browsers (WebSocket).",
   "license": "MIT",
-  "homepage": "https://github.com/author/library#readme",
+  "author": "William Beaudin",
+  "keywords": [
+    "mqtt",
+    "mqtt5",
+    "mqtt-3.1.1",
+    "websocket",
+    "iot",
+    "client",
+    "smartqtt"
+  ],
+  "homepage": "https://github.com/T1WiLLi/SmartQTTt#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/author/library.git"
+    "url": "https://github.com/T1WiLLi/SmartQTT"
   },
   "bugs": {
-    "url": "https://github.com/author/library/issues"
+    "url": "https://github.com/T1WiLLi/SmartQTT/issues"
   },
   "exports": {
     ".": "./dist/index.mjs",
